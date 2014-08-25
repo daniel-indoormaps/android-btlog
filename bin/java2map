@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+#vim:ft=ruby
+
+Comment = /\/\/.*$/
+Pat = /^.*final\s+int\s+(?<name>(_|\w)+)\s*=\s*(?<value>\d+)\s*;\s*$/
+$stdin.each_line do |line|
+    line.gsub!( Comment, "" )
+    matchdata = Pat.match( line )
+    if matchdata
+        puts '"%s"=>"%s",' % [ matchdata["value"], matchdata["name"] ]
+    end
+end

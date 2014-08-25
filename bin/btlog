@@ -1,0 +1,113 @@
+#!/usr/bin/env ruby
+#vim:ft=ruby
+
+$:.push File.dirname( File.realpath(__FILE__)) + "/../lib"
+
+require 'log_scan'
+
+include LogScan
+
+input_io = $stdin
+output_io = $stdout
+
+if ARGV.length > 1
+    input_io = File.open( ARGV[0], "r" )
+end
+
+if ARGV.length > 2
+    output_io = File.open( ARGV[1], "w" )
+end
+
+class BluetoothAdapter
+    include LogScan
+
+    #From BluetoothAdapterStateMachine.java
+    Messages = { 
+        "1" => "USER_TURN_ON", 
+        "2" => "USER_TURN_OFF",
+        "3" => "PER_PROCESS_TURN_ON",
+        "4" => "PER_PROCESS_TRUN_OFF",
+        "5" => "TRUN_HOT",
+        "51" => "SERVICE_RECORD_LOADED",
+        "52" => "ALL_DEVICES_DISCONNECTED",
+        "53" => "SCAN_MODE_CHANGED",
+        "54" => "POWER_STATE_CHANGED",
+        "55" => "AIRPLANE_MODE_ON",
+        "56" => "AIRPLANE_MODE_OFF",
+
+       "101" =>  "TURN_ON_CONTINUE",
+       "102" => "TURN_COLD",
+       "103" => "DEVICES_DISCONNECT_TIMEOUT",
+       "104" => "PREPARE_BLUETOOTH_TIMEOUT",
+       "105" => "POWER_DOWN_TIMEOUT",
+    }
+
+    States = {
+        #From BluetoothAdapter.java
+        "10" => "BluetoothAdapter.STATE_OFF",
+        "11" => "BluetoothAdapter.STATE_TURNING_ON",
+        "12" => "BluetoothAdapter.STATE_ON",
+        "13" => "BluetoothAdapter.STATE_TURNING_OFF"
+    }
+
+    DeviceProfileMessages = {
+        "1"=>"CONNECT_HFP_OUTGOING",
+        "2"=>"CONNECT_HFP_INCOMING",
+        "3"=>"CONNECT_A2DP_OUTGOING",
+        "4"=>"CONNECT_A2DP_INCOMING",
+        "5"=>"CONNECT_HID_OUTGOING",
+        "6"=>"CONNECT_HID_INCOMING",
+        "50"=>"DISCONNECT_HFP_OUTGOING",
+        "51"=>"DISCONNECT_HFP_INCOMING",
+        "52"=>"DISCONNECT_A2DP_OUTGOING",
+        "53"=>"DISCONNECT_A2DP_INCOMING",
+        "54"=>"DISCONNECT_HID_OUTGOING",
+        "55"=>"DISCONNECT_HID_INCOMING",
+        "56"=>"DISCONNECT_PBAP_OUTGOING",
+        "100"=>"UNPAIR",
+        "101"=>"AUTO_CONNECT_PROFILES",
+        "102"=>"TRANSITION_TO_STABLE",
+        "103"=>"CONNECT_OTHER_PROFILES",
+        "104"=>"CONNECTION_ACCESS_REQUEST_REPLY",
+        "105"=>"CONNECTION_ACCESS_REQUEST_EXPIRY",
+        "4000"=>"CONNECT_OTHER_PROFILES_DELAY",
+        "7000"=>"CONNECTION_ACCESS_REQUEST_EXPIRY_TIMEOUT",
+        "-1"=>"StateMachine.SM_QUIT_CMD",
+        "-2"=>"StateMachine.SM_INIT_CMD",
+    }        
+
+    BluetoothInputProfileState = {
+        "0"=>"BluetoothProfile.STATE_DISCONNECTED",
+        "1"=>"BluetoothProfile.STATE_CONNECTING",
+        "2"=>"BluetoothProfile.STATE_CONNECTED",
+        "3"=>"BluetoothProfile.STATE_DISCONNECTING",
+    }
+
+    rule 'BluetoothInputProfileHandler: InputDevice state : device: (?<bt_mac_addr>(\w|:)+)\s+State:(?<start_state>\d+)->(?<end_state>\d+)\s*', '08-10 22:42:06.965   970  2940 D BluetoothInputProfileHandler: InputDevice state : device: 00:02:76:4E:41:A6 State:1->0' do |matchdata,line|
+        puts "%s <==== %s -> %s" %  [ line.chop , BluetoothInputProfileState[matchdata["start_state"]], BluetoothInputProfileState[matchdata["end_state"] ] ]
+    end
+
+    rule 'BluetoothDeviceProfileState: Entering ACL Connected state with:\s+(?<message_id>(-|\d)+)\s*', '08-10 22:43:09.465   970  3018 I BluetoothDeviceProfileState: Entering ACL Connected state with: 102' do |matchdata, line|
+        puts "%s <==== %s " %  [ line.chop , DeviceProfileMessages[matchdata["message_id"]] ]
+    end
+
+
+    rule 'BluetoothAdapterStateMachine:\s+Bluetooth state\s+(?<start_state>\d+)\s*->\s*(?<end_state>\d+)\s*',  '08-10 22:42:42.517   970  1132 D BluetoothAdapterStateMachine: Bluetooth state 12 -> 13' do |matchdata, line|
+        puts "%s <==== %s -> %s" %  [ line.chop , States[matchdata["start_state"]], States[matchdata["end_state"] ] ]
+    end
+
+    rule 'BluetoothAdapterStateMachine:\s+\w+\s+process message:\s+(?<message_id>\d+)\s*',  '01-04 02:04:22.620   970  1132 D BluetoothAdapterStateMachine: PowerOff process message: 1' do |matchdata, line|
+        puts "%s <==== %s " %  [ line.chop , Messages[matchdata["message_id"]] ]
+    end
+
+    rule 'BluetoothAdapterStateMachine:.*', '01-04 02:04:22.620   970  1132 D BluetoothAdapterStateMachine: PowerOff process message: 1' do |matchdata, line|
+        puts "xxxx" + line
+    end
+end
+
+
+input_io.each_line do |line|
+    if ! BluetoothAdapter.match_line( line )
+        puts line
+    end
+end
