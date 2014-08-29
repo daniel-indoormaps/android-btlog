@@ -87,25 +87,37 @@ class BluetoothAdapter
         "1"=>"BluetoothProfile.STATE_CONNECTING",
         "2"=>"BluetoothProfile.STATE_CONNECTED",
         "3"=>"BluetoothProfile.STATE_DISCONNECTING",
+        #From A2DP
+        "10"=>"BluetoothA2DP.STATE_PLAYING",
+        "11"=>"BluetoothA2DP.STATE_NOT_PLAYING",
     }
+
+    X60AudioOutput = {
+        "0"=>"MPQ_AUDIO_OUTPUT_SPEAKER",
+        "1"=>"MPQ_AUDIO_OUTPUT_SPDIF",
+        "2"=>"MPQ_AUDIO_OUTPUT_BLUETOOTH_A2DP",
+        "3"=>"MPQ_AUDIO_OUTPUT_SPEAKE3",
+        "4"=>"MPQ_AUDIO_OUTPUT_WIRED_HEADSET",
+    }
+
 
     ui_bt_state = nil
 
     rule 'BluetoothInputProfileHandler', 'InputDevice state : device: (?<bt_mac_addr>(\w|:)+)\s+State:(?<start_state>\d+)->(?<end_state>\d+)\s*', '08-10 22:42:06.965   970  2940 D BluetoothInputProfileHandler: InputDevice state : device: 00:02:76:4E:41:A6 State:1->0' do |matchdata,line|
-        puts "%s <==== %s -> %s" %  [ line.chop , BluetoothInputProfileState[matchdata["start_state"]], BluetoothInputProfileState[matchdata["end_state"] ] ]
+        puts "%s <==== %s -> %s" %  [ line.strip , BluetoothInputProfileState[matchdata["start_state"]], BluetoothInputProfileState[matchdata["end_state"] ] ]
     end
 
     rule 'BluetoothDeviceProfileState', 'Entering ACL Connected state with:\s+(?<message_id>(-|\d)+)\s*', '08-10 22:43:09.465   970  3018 I BluetoothDeviceProfileState: Entering ACL Connected state with: 102' do |matchdata, line|
-        puts "%s <==== %s " %  [ line.chop , DeviceProfileMessages[matchdata["message_id"]] ]
+        puts "%s <==== %s " %  [ line.strip , DeviceProfileMessages[matchdata["message_id"]] ]
     end
 
 
     rule 'BluetoothAdapterStateMachine', 'Bluetooth state\s+(?<start_state>\d+)\s*->\s*(?<end_state>\d+)\s*',  '08-10 22:42:42.517   970  1132 D BluetoothAdapterStateMachine: Bluetooth state 12 -> 13' do |matchdata, line|
-        puts "%s <==== %s -> %s" %  [ line.chop , States[matchdata["start_state"]], States[matchdata["end_state"] ] ]
+        puts "%s <==== %s -> %s" %  [ line.strip , States[matchdata["start_state"]], States[matchdata["end_state"] ] ]
     end
 
     rule 'BluetoothAdapterStateMachine', '\s+\w+\s+process message:\s+(?<message_id>\d+)\s*',  '01-04 02:04:22.620   970  1132 D BluetoothAdapterStateMachine: PowerOff process message: 1' do |matchdata, line|
-        puts "%s <==== %s " %  [ line.chop , Messages[matchdata["message_id"]] ]
+        puts "%s <==== %s " %  [ line.strip , Messages[matchdata["message_id"]] ]
     end
 
     rule 'BluetoothAdapterStateMachine', '.*', '01-04 02:04:22.620   970  1132 D BluetoothAdapterStateMachine: PowerOff process message: 1' do |matchdata, line|
@@ -113,12 +125,24 @@ class BluetoothAdapter
     end
 
     rule 'GlobalBluetoothSet', 'updateContent bluetoothState =\s+(?<state>\d+)\s*', '08-05 23:59:20.163  1474  1474 D GlobalBluetoothSet: updateContent bluetoothState = 12' do |matchdata, line|
-        puts "%s <==== %s -> %s " %  [ line.chop , States[ui_bt_state], States[matchdata["state"]] ]
+        puts "%s <==== %s -> %s " %  [ line.strip , States[ui_bt_state], States[matchdata["state"]] ]
         ui_bt_state = matchdata["state"]
     end
 
     rule 'ScanTimer', '.*', '08-05 23:59:39.172  1474  3096 D ScanTimer: left time:1' do |matchdata, line|
-        puts "%s <==== %s " %  [ line.chop , "GlobalBluetoothSet" ]
+        puts "%s <==== %s " %  [ line.strip , "GlobalBluetoothSet" ]
+    end
+
+    rule 'HeadsetReceiver', 'BluetoothA2dp.\w+ state_\w+\s*:(?<state>\d+)\s*', '08-21 19:43:37.068 D/HeadsetReceiver(  664): BluetoothA2dp.HEADSET state_headset :2' do |matchdata, line|
+        puts "%s <==== %s " %  [ line.strip , BluetoothInputProfileState[matchdata["state"]] ]
+    end
+
+    rule 'HeadsetReceiver', 'Switch to audio output device id:(?<device_id>\d+)\s*', '08-21 19:43:37.068 D/HeadsetReceiver(  664): Switch to audio output device id:2' do |matchdata, line|
+        puts "%s <==== %s   [Bluetooth] Don't trust it, it is deducted by HeadsetReceiver itself" %  [ line.strip , X60AudioOutput[matchdata["device_id"]] ]
+    end
+
+    rule 'BluetoothA2dpService', 'A2DP: onSinkPropertyChanged newState is: (?<state>\d+)mPlayingA2dpDevice: null\s*', '08-21 19:43:36.047 D/BluetoothA2dpService(  664): A2DP: onSinkPropertyChanged newState is: 2mPlayingA2dpDevice: null' do |matchdata,line|
+        puts "%s <==== %s " %  [ line.strip , BluetoothInputProfileState[matchdata["state"]] ]
     end
 end
 
