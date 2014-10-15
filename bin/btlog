@@ -100,6 +100,20 @@ class BluetoothAdapter
         "4"=>"MPQ_AUDIO_OUTPUT_WIRED_HEADSET",
     }
 
+    #State defined in BoundStateMachine
+    BondState = {
+        "0"=>"BOND_STATE_NONE",
+        "1"=>"BOND_STATE_BONDING",
+        "2"=>"BOND_STATE_BONDED",
+    }
+
+    #State defined in BluetoothDevice, used in BoundStateMachine.sendIntent
+    BondIntentState = {
+        "10"=>"BOND_NONE",
+        "11"=>"BOND_BONDING",
+        "12"=>"BOND_BONDED",
+    }
+
 
     ui_bt_state = nil
 
@@ -141,8 +155,28 @@ class BluetoothAdapter
         puts "%s <==== %s   [Bluetooth] Don't trust it, it is deducted by HeadsetReceiver itself" %  [ line.strip , X60AudioOutput[matchdata["device_id"]] ]
     end
 
-    rule 'BluetoothA2dpService', 'A2DP: onSinkPropertyChanged newState is: (?<state>\d+)mPlayingA2dpDevice: null\s*', '08-21 19:43:36.047 D/BluetoothA2dpService(  664): A2DP: onSinkPropertyChanged newState is: 2mPlayingA2dpDevice: null' do |matchdata,line|
+    rule 'BluetoothA2dpService', 'A2DP: onSinkPropertyChanged newState is: (?<state>\d+)mPlayingA2dpDevice: (?<device_id>\S+)\s*', '08-21 19:43:36.047 D/BluetoothA2dpService(  664): A2DP: onSinkPropertyChanged newState is: 2mPlayingA2dpDevice: null\s*' do |matchdata,line|
         puts "%s <==== %s " %  [ line.strip , BluetoothInputProfileState[matchdata["state"]] ]
+    end
+
+    rule 'BluetoothA2dpService', 'A2DP Playing state : device:\s+(?<device_id>\S+)\s+State:\s*(?<start_state>\d+)\s*->\s*(?<end_state>\d+)\s*', '04-08 21:48:05.224   647  6084 D BluetoothA2dpService: A2DP Playing state : device: 00:0D:44:C1:EA:51 State:11->10' do |matchdata,line|
+        puts "%s <==== %s -> %s " %  [ line.strip , BluetoothInputProfileState[matchdata['start_state']], BluetoothInputProfileState[matchdata["end_state"]] ]
+    end
+
+    rule 'SignalSourceManager', 'MpqMediaService -- BluetoothA2dp.\w+ state_\w+\s*:(?<state>\d+)\s*', '08-21 19:43:37.068 D/HeadsetReceiver(  664): BluetoothA2dp.HEADSET state_headset :2' do |matchdata, line|
+        puts "%s <==== %s " %  [ line.strip , BluetoothInputProfileState[matchdata["state"]] ]
+    end
+
+    rule 'Launcher', 'T2LauncherApplication -- kill launcher as Configuration change\s+', '04-08 21:48:02.551  8379  8379 D Launcher: T2LauncherApplication -- kill launcher as Configuration change' do |matchdata, line|
+        puts "%s <==== %s " %  [ line.strip , "Bluetooth: Change language, lunch killed" ]
+    end
+
+    rule "BluetoothBondStateMachine", '\s*Bond State Change Intent:(?<btaddr>..:..:..:..:..:..) OldState: (?<old_state>\d+) NewState: (?<new_state>\d+)\s*', '10-13 18:53:08.728  2554  3502 I BluetoothBondStateMachine: Bond State Change Intent:0C:FC:83:81:05:FC OldState: 10 NewState: 11' do |matchdata, line|
+        puts "%s <=====   %s --> %s" % [ line.strip, BondIntentState[matchdata["old_state"]], BondIntentState[matchdata["new_state"]] ]
+    end
+
+    rule "BluetoothBondStateMachine", '\s*bondStateChangeCallback: Status: (?<status>\d+) Address: (?<btaddr>..:..:..:..:..:..) newState: (?<new_state>\d+)\s*', '10-13 18:53:13.872  2554  3500 I BluetoothBondStateMachine: bondStateChangeCallback: Status: 10 Address: 0C:FC:83:81:05:FC newState: 0' do |matchdata,line|
+        puts "%s <=====   Adapter Status: %s --> BondState: %s" % [ line.strip, BondIntentState[matchdata["status"]], BondState[matchdata["new_state"]] ]
     end
 end
 

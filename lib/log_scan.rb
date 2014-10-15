@@ -18,14 +18,15 @@ module LogScan
 
         COMMON_REX ={ 
             :mstar => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\d+\s+\d+\s+\w\s+%s:\s+',
-            :qualcomm => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\w\/%s\s*\(\s*\d+\):\s+',
+            :x60 => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\w\/%s\s*\(\s*\d+\):\s+',
+            :max70 => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\d+\s+\d+\s+\w\s+%s:\s*',
         }
 
         def self.detect_vendor(line)
             puts line
             COMMON_REX.each_pair do |key,value|
-                puts "%s=>%s" % [ key, value % '\w+' ]
-                if Regexp.compile( value % '\w+' ).match( line )
+                puts "%s=>%s" % [ key, value % '.*' ]
+                if Regexp.compile( value % '.*' ).match( line )
                      return key
                 end
             end
