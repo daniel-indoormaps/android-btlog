@@ -17,17 +17,18 @@ module LogScan
         
 
         COMMON_REX ={ 
-            :mstar => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\d+\s+\d+\s+\w\s+%s:\s+',
-            :x60 => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\w\/%s\s*\(\s*\d+\):\s+',
-            :max70 => '^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\d+\s+\d+\s+\w\s+%s:\s*',
+            :mstar => ['^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\d+\s+\d+\s+\w+\s+',':\s+'],
+            :x60 => ['^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\w\/','\(\s*\d+\):\s+' ],
+            :max70 =>['^\s*\d\d-\d\d\s+\d\d:\d\d:\d\d\.\d\d\d\s+\d+\s+\d+\s+\w\s+',':\s*'],
         }
 
         def self.detect_vendor(line)
-            puts line
+            #puts line
             COMMON_REX.each_pair do |key,value|
-                puts "%s=>%s" % [ key, value % '.*' ]
-                if Regexp.compile( value % '.*' ).match( line )
-                     return key
+                #puts "%s=>%s" % [ key, value[0] ]
+                if Regexp.compile( value[0] ).match( line )
+                    #puts "Detect vendor result: #{key}"
+                    return key
                 end
             end
 
@@ -36,29 +37,47 @@ module LogScan
 
         def initialize( tag, regex, sample, block )
             @sample = sample
-            puts Config.inst.vendor
-            puts COMMON_REX[Config.inst.vendor] % tag + regex + '$'
-            @regex = gen_regexp( Config.inst.vendor, tag, regex )
+            #@regex = gen_regexp( Config.inst.vendor, tag, regex )
+            @regex = regex
+            @tag = tag
+            @block = block
             @action = block
-            if test_match( :mstar, tag, regex ).nil? and test_match( :qualcomm, tag, regex ).nil?
-                raise "%s can't match %s" % [ @regex.to_s, @sample ]
+            if !test_match( tag, regex )
+                raise "<<%s>> can't match <<%s>>" % [ @regex.to_s, @sample ]
             end
         end
 
         def gen_regexp( vendor, tag, regex )
-            Regexp.compile( COMMON_REX[vendor] % tag + regex + '$' )
+            #puts "===<<"+COMMON_REX[vendor][0] + tag + COMMON_REX[vendor][1] + regex + '$'+">>===="
+            Regexp.compile( COMMON_REX[vendor][0] + tag + COMMON_REX[vendor][1] + regex + '$' )
         end
 
-        def test_match(vendor, tag, regex)
-            gen_regexp(vendor,tag,regex).match( @sample ).nil?
+        def dump_regexp
+            COMMON_REX.each_pair do |vendor,value|
+                puts "<<"+COMMON_REX[vendor][0] + @tag + COMMON_REX[vendor][1] + @regex + '$'+">>"
+            end
+        end
+
+        def test_match(tag, regex)
+            COMMON_REX.each_pair do |key,value|
+                if gen_regexp(key,tag,regex).match( @sample )
+                    return true
+                end
+            end
+
+            false
         end
 
         def match( line )
-            result = @regex.match(line)
+            @regexp ||= gen_regexp( Config::inst::vendor, @tag, @regex )
+            result = @regexp.match(line)
             if result
                  @action.call( result, line )
             end
             result
+        rescue => ex
+            $stderr.puts "+++++++++++++===============[#{line}]"
+            raise ex
         end
     end
 
@@ -85,10 +104,16 @@ module LogScan
 
             !cont
         end
+
+        def dump
+            rules.each do |r|
+                r.dump_regexp
+            end
+        end
     end
 
     def self.included(receiver)
-        puts "Extend #{receiver}"
+        #puts "Extend #{receiver}"
         if receiver === Object
             receiver.include(ClassMethods)
         else
