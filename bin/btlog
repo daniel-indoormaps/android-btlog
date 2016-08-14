@@ -1,14 +1,18 @@
 #!/usr/bin/env ruby
 #vim:ft=ruby
 
+ENV['BUNDLE_GEMFILE']=File.dirname( File.realpath( __FILE__ ) ) + "/../Gemfile"
+
+require 'bundler/setup'
+
 require 'main'
 
-$:.push File.dirname( File.realpath(__FILE__)) + "/../lib"
+#$:.push File.dirname( File.realpath(__FILE__)) + "/../lib"
 
-require 'log_scan'
+require 'android/log_scan'
 
 class BluetoothAdapter
-    include LogScan
+    include Android::LogScan
 
     #From BluetoothAdapterStateMachine.java
     Messages = { 
@@ -109,6 +113,9 @@ class BluetoothAdapter
         puts "%s <==== %s " %  [ line.strip , DeviceProfileMessages[matchdata["message_id"]] ]
     end
 
+    rule 'BluetoothAdapterState', 'Bluetooth adapter state changed:\s+(?<start_state>\d+)\s*->\s*(?<end_state>\d+)\s*',  '07-15 09:16:49.191 24049 24067 I BluetoothAdapterState: Bluetooth adapter state changed: 12-> 13' do |matchdata, line|
+        puts "%s <==== %s -> %s" %  [ line.strip , States[matchdata["start_state"]], States[matchdata["end_state"] ] ]
+    end
 
     rule 'BluetoothAdapterStateMachine', 'Bluetooth state\s+(?<start_state>\d+)\s*->\s*(?<end_state>\d+)\s*',  '08-10 22:42:42.517   970  1132 D BluetoothAdapterStateMachine: Bluetooth state 12 -> 13' do |matchdata, line|
         puts "%s <==== %s -> %s" %  [ line.strip , States[matchdata["start_state"]], States[matchdata["end_state"] ] ]
@@ -207,7 +214,7 @@ Main {
             first_line = @input_io.readline 
         end
 
-        LogScan::Config.inst.vendor = LogScan::Rule.detect_vendor first_line
+        Android::LogScan::Config.inst.vendor = Android::LogScan::Rule.detect_vendor first_line
     end
 
     def run
@@ -217,16 +224,18 @@ Main {
 
         if params['test'].given?
             detect_vendor
+            puts Android::LogScan::Config.inst.vendor
             exit
         end
 
-        if params['dump'].given?
-            BluetoothAdapter.dump
-            exit
-        end
 
         if !param['vendor'].given?
             detect_vendor
+        end
+
+        if params['dump'].given?
+            BluetoothAdapter.dump( Android::LogScan::Config.inst.vendor )
+            exit
         end
 
         @input_io.each_line do |line|
